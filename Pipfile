@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 pyaudio = "*"
+numpy = "*"
+scipy = "*"
 
 [dev-packages]
 
