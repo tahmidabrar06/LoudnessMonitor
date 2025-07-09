@@ -7,7 +7,7 @@ from scipy.signal import butter, lfilter
 import numpy
 
 #loudness threshold in dB
-loudnessThreshhold = 60
+loudnessThreshhold = 65
 
 #Stream parameters
 CHUNK = 1024
@@ -46,7 +46,7 @@ def beep():
         alertStream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
                         channels=wf.getnchannels(),
                         rate=wf.getframerate(),
-                        output=False) #Output for testing
+                        output=True) #Output for testing
 
         while len(data := wf.readframes(CHUNK)):
             alertStream.write(data)
