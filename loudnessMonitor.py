@@ -23,7 +23,7 @@ stream = pyAudio.open(format=FORMAT,
                       input=True,
                       output=True)
 
-#For testing, print decibel level every 'x' second
+#For testing, print decibel level 'x' times per second
 x = 10
 chunks_per_second = (RATE // CHUNK) // x
 counter = 0
