@@ -6,6 +6,7 @@ import wave
 from scipy.signal import butter, lfilter
 import numpy
 
+volume = 0.2
 #loudness threshold in dB
 loudnessThreshhold = 65
 
@@ -23,12 +24,10 @@ stream = pyAudio.open(format=FORMAT,
                       input=True,
                       output=True)
 
-#For testing, print decibel level 'x' times per second
+#For testing, print decibel level every 'x' second
 x = 10
 chunks_per_second = (RATE // CHUNK) // x
 counter = 0
-
-
 
 #convert rms to decibel
 def rms_to_dB(rms):
@@ -37,7 +36,14 @@ def rms_to_dB(rms):
     else:
         return 1e-10
 
-#alert
+#Set Volume
+def adjustVolume(sample):
+    #Byte to numpy array
+    nmArray = numpy.frombuffer(sample, dtype=numpy.int16)
+    adjustedAudio = (nmArray * volume).astype(numpy.int16)
+    return adjustedAudio.tobytes()
+
+#play alert
 def beep():
     with wave.open(sys.path[0]+"\\beep.wav", 'rb') as wf:
         
@@ -48,8 +54,8 @@ def beep():
                         rate=wf.getframerate(),
                         output=True) #Output for testing
 
-        while len(data := wf.readframes(CHUNK)):
-            alertStream.write(data)
+        while len(data := wf.readframes(CHUNK)):  
+            alertStream.write(adjustVolume(data))
         alertStream.close()
 
 #noise filter
@@ -60,6 +66,10 @@ def highpass_filter(audio_bytes, cutoffFreq=200, freq=RATE, order=5):
     return filtered.astype(numpy.int16).tobytes()
 
 if __name__ == "__main__":
+    volume = float(input("Set alert volume: "))
+    threshhold = (input("Set loudness threshhold (default 65 dB, leave empty for default): "))
+    if threshhold != "":
+        loudnessThreshhold = int(threshhold)
     while True:
         data = stream.read(CHUNK)
         filtered_data = highpass_filter(data)
@@ -73,4 +83,3 @@ if __name__ == "__main__":
             if soundLevel > loudnessThreshhold:
                 print("Too loud")
                 beep()
-
