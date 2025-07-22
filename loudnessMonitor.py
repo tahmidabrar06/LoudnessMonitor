@@ -6,80 +6,80 @@ import wave
 from scipy.signal import butter, lfilter
 import numpy
 
-volume = 0.2
-#loudness threshold in dB
-loudnessThreshhold = 65
+class LoudnessMonitor:
+    def __init__(self, volume=0.3, loudnessThreshhold=65, rate=44100, chunk=1024, cutoffFreq = 200):
+        self.volume = volume
+        self.loudnessThreshhold = loudnessThreshhold
+        self.rate = rate
+        self.chunk = chunk
+        self.channels = 2
+        self.format = pyaudio.paInt16
+        self.cutoffFreq = cutoffFreq
 
-#Stream parameters
-CHUNK = 1024
-FORMAT = pyaudio.paInt16
-CHANNELS = 2
-RATE = 44100
+        self.pyAudio = pyaudio.PyAudio()
+        self.stream = self.pyAudio.open(format=self.format,
+                                        channels=self.channels,
+                                        rate=self.rate,
+                                        frames_per_buffer=self.chunk,
+                                        input=True,
+                                        output=True)
 
-pyAudio = pyaudio.PyAudio()
-stream = pyAudio.open(format=FORMAT,
-                      channels=CHANNELS,
-                      rate=RATE,
-                      frames_per_buffer=CHUNK,
-                      input=True,
-                      output=True)
+        self.running = False
+        self.decibel = 0
+        #For testing
+        self.chunksPerSec = (self.rate // self.chunk) // 10
 
-#For testing, print decibel level every 'x' second
-x = 10
-chunks_per_second = (RATE // CHUNK) // x
-counter = 0
+    # Convert RMS to Decibel
+    def rms_to_dB(self, rms):
+        if rms > 0:
+            return 20 * math.log10(rms)
+        else:
+            return 1e-10
 
-#convert rms to decibel
-def rms_to_dB(rms):
-    if rms > 0:
-        return 20 * math.log10(rms)
-    else:
-        return 1e-10
+    # Set Volume
+    def SetVolume(self, sample):
+        #Byte to numpy array
+        nmArray = numpy.frombuffer(sample, dtype=numpy.int16)
+        adjustedAudio = (nmArray * self.volume).astype(numpy.int16)
+        return adjustedAudio.tobytes()
 
-#Set Volume
-def adjustVolume(sample):
-    #Byte to numpy array
-    nmArray = numpy.frombuffer(sample, dtype=numpy.int16)
-    adjustedAudio = (nmArray * volume).astype(numpy.int16)
-    return adjustedAudio.tobytes()
+    # Play alert
+    def beep(self):
+        with wave.open(sys.path[0]+"\\beep.wav", 'rb') as wav:  
+            p = pyaudio.PyAudio()
+            alertStream = p.open(format=p.get_format_from_width(wav.getsampwidth()),
+                            channels=wav.getnchannels(),
+                            rate=wav.getframerate(),
+                            output=True)
 
-#play alert
-def beep():
-    with wave.open(sys.path[0]+"\\beep.wav", 'rb') as wf:
-        
-        p = pyaudio.PyAudio()
+            while len(data := wav.readframes(self.chunk)):  
+                alertStream.write(self.SetVolume(data))
+            alertStream.close()
 
-        alertStream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
-                        channels=wf.getnchannels(),
-                        rate=wf.getframerate(),
-                        output=True) #Output for testing
+    # Noise filter
+    def highpass_filter(self, audio_bytes, order=5):
+        audio_np = numpy.frombuffer(audio_bytes, dtype=numpy.int16)
+        b, a = butter(order, self.cutoffFreq / (0.5 * self.rate), btype='high', analog=False)
+        filtered = lfilter(b, a, audio_np)
+        return filtered.astype(numpy.int16).tobytes()
 
-        while len(data := wf.readframes(CHUNK)):  
-            alertStream.write(adjustVolume(data))
-        alertStream.close()
-
-#noise filter
-def highpass_filter(audio_bytes, cutoffFreq=200, freq=RATE, order=5):
-    audio_np = numpy.frombuffer(audio_bytes, dtype=numpy.int16)
-    b, a = butter(order, cutoffFreq / (0.5 * freq), btype='high', analog=False)
-    filtered = lfilter(b, a, audio_np)
-    return filtered.astype(numpy.int16).tobytes()
-
+    # Start Monitoring Input
+    def monitor(self):
+        counter = 0
+        while True:
+            data = self.stream.read(self.chunk)
+            filtered = self.highpass_filter(data)
+            rms = audioop.rms(filtered, 2)
+            # Output Audio (For Testing)
+            #stream.write(data) 
+            self.decibel = int(self.rms_to_dB(rms))
+            counter += 1
+            if counter >= self.chunksPerSec:
+                print(self.decibel)
+                counter = 0
+                if self.decibel > self.loudnessThreshhold:
+                    print("Too loud")
+                    self.beep()
+                    
 if __name__ == "__main__":
-    volume = float(input("Set alert volume: "))
-    threshhold = (input("Set loudness threshhold (default 65 dB, leave empty for default): "))
-    if threshhold != "":
-        loudnessThreshhold = int(threshhold)
-    while True:
-        data = stream.read(CHUNK)
-        filtered_data = highpass_filter(data)
-        rms = audioop.rms(filtered_data, 2)
-        #stream.write(data) 
-        soundLevel = int(rms_to_dB(rms))
-        counter += 1
-        if counter >= chunks_per_second:
-            print(soundLevel)
-            counter = 0
-            if soundLevel > loudnessThreshhold:
-                print("Too loud")
-                beep()
+    LoudnessMonitor().monitor()
