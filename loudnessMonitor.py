@@ -1,6 +1,7 @@
 import math
 import pyaudio
 import sys
+import os
 import wave
 from scipy.signal import butter, lfilter
 import numpy
@@ -50,7 +51,15 @@ class LoudnessMonitor:
 
     # Play alert
     def beep(self):
-        with wave.open(sys.path[0]+"\\beep.wav", 'rb') as wav:
+
+        # Set path so its compatible with PyInstaller
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(__file__)
+        beep_path = os.path.join(base_path, 'beep.wav')
+
+        with wave.open(beep_path, 'rb') as wav:
             alertStream = self.pyAudio.open(format=self.pyAudio.get_format_from_width(wav.getsampwidth()),
                             channels=wav.getnchannels(),
                             rate=wav.getframerate(),
@@ -102,7 +111,15 @@ class GUI():
         self.root = tk.Tk()
         self.loudnessMonitor=loudnessMonitor
         self.root.title("Loudness Monitor")
-        self.root.iconbitmap("icon.ico")
+
+        # Set path so its compatible with PyInstaller
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(__file__)
+
+        iconPath = os.path.join(base_path, 'icon.ico')
+        self.root.iconbitmap(iconPath)
 
         # Font
         self.paramemterFont = ("Arial", 10)
