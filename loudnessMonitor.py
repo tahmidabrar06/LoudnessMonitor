@@ -28,7 +28,6 @@ class LoudnessMonitor:
 
         self.running = False
         self.decibel = 0
-        #For testing
         self.chunksPerSec = (self.rate // self.chunk) // 10
 
     # Convert RMS to Decibel
@@ -102,27 +101,68 @@ class GUI():
     def __init__(self, loudnessMonitor):
         self.root = tk.Tk()
         self.loudnessMonitor=loudnessMonitor
+        self.root.title("Loudness Monitor")
+        self.root.iconbitmap("icon.ico")
+
         # Font
         self.paramemterFont = ("Arial", 10)
         self.buttonFont = ("Arial", 10)
 
-        # LoudnessMonitor Paramters
-        self.volumeSlider = Scale(self.root, from_=100, to=0)
-        self.volumeSlider.pack()
-        self.volume = tk.Label(self.root, text="Volume", font=self.paramemterFont)
-        self.volume.pack()
+        # Slider Frame
+        self.frame = tk.Frame(self.root)
 
-        self.loudnessThresholdSlider = Scale(self.root, from_=120, to=1)
-        self.loudnessThresholdSlider.pack()
-        self.loudnessThreshold = tk.Label(self.root, text="Threshold (dB)", font=self.paramemterFont)
-        self.loudnessThreshold.pack()
+        # Configure Slider Grid
+        self.frame.columnconfigure(0, weight=1)
+        self.frame.columnconfigure(1, weight=1)
+        self.frame.columnconfigure(2, weight=1)
+
+        # Volume Slider and Label
+        self.volumeSlider = Scale(self.frame, from_=100, to=0)
+        self.volumeSlider.grid(row=0, column=0)
+        self.volume = tk.Label(self.frame, text="Volume", font=self.paramemterFont)
+        self.volume.grid(row=1, column=0)
+
+        # Threshold Slider and Label
+        self.loudnessThresholdSlider = Scale(self.frame, from_=120, to=1)
+        self.loudnessThresholdSlider.grid(row=0, column=1)
+        self.loudnessThreshold = tk.Label(self.frame, text="Threshold (dB)", font=self.paramemterFont)
+        self.loudnessThreshold.grid(row=1, column=1)
+
+        # Highpass Filter Slider and Label
+        self.highPassFilterSlider = Scale(self.frame, from_=1000, to=0)
+        self.highPassFilterSlider.grid(row=0, column=2)
+        self.highPassFilter = tk.Label(self.frame, text="Highpass (Hz)", font=self.paramemterFont)
+        self.highPassFilter.grid(row=1, column=2)
+
+        self.frame.pack(padx=20, pady=10)
+
+        # Decibel Display Frame
+        self.dbFrame = tk.Frame(self.root)
+
+        # Configure Grid
+        self.dbFrame.columnconfigure(0, weight=1)
+
+        # Label To Display dB Level
+        self.decibel = tk.Label(self.dbFrame, text="Loudness (dB): 0", font=("Arial",10))
+        self.decibel.grid(row=0, column=0)
+
+        self.dbFrame.pack(pady=5)
+
+        # Button Frame
+        self.buttonFrame = tk.Frame(self.root)
+
+        # Configure Button Grid
+        self.buttonFrame.columnconfigure(0, weight=1)
+        self.buttonFrame.columnconfigure(1, weight=1)
 
         # Buttons
-        self.startButton = tk.Button(self.root, text="Start", font=self.buttonFont, command=self.startLoudnessMonitor)
-        self.startButton.pack()
+        self.startButton = tk.Button(self.buttonFrame, text="Start", font=self.buttonFont, command=self.startLoudnessMonitor)
+        self.startButton.grid(row=0, column=0, sticky='ew', padx=5)
 
-        self.stopButton = tk.Button(self.root, text="Stop", font=self.buttonFont, command=self.stopLoudnessMonitor, state="disabled")
-        self.stopButton.pack()
+        self.stopButton = tk.Button(self.buttonFrame, text="Stop", font=self.buttonFont, command=self.stopLoudnessMonitor, state="disabled")
+        self.stopButton.grid(row=0, column=1, sticky='ew', padx=5)
+
+        self.buttonFrame.pack(fill='x')
 
     # Update LoudnessMonitor parameters
     def setParameters(self):
@@ -135,10 +175,12 @@ class GUI():
         if not self.loudnessMonitor.running:
             monitor_thread = threading.Thread(target=self.loudnessMonitor.start, daemon=True)
             monitor_thread.start()
+            self.updateLoudnessDisplay()
         self.startButton.config(state="disabled")
         self.stopButton.config(state="normal")
         self.volumeSlider.config(state="disabled")
         self.loudnessThresholdSlider.config(state="disabled")
+        self.highPassFilterSlider.config(state="disabled")
 
     # Stop Loudness Monitor
     def stopLoudnessMonitor(self):
@@ -147,10 +189,30 @@ class GUI():
         self.stopButton.config(state="disabled")
         self.volumeSlider.config(state="normal")
         self.loudnessThresholdSlider.config(state="normal")
+        self.highPassFilterSlider.config(state="normal")
+
+    # Set saved values (or default if no custom values saved)
+    def setValues(self):
+        self.highPassFilterSlider.set(200)
+        self.loudnessThresholdSlider.set(65)
+        self.volumeSlider.set(30)
+
+        #Add saved values
+
+    # Update Decibel Level in GUI
+    def updateLoudnessDisplay(self):
+        if self.loudnessMonitor.running:
+            dB = self.loudnessMonitor.decibel
+            self.decibel.config(text=f"Loudness (dB): {max(dB, 0)}")
+            self.root.after(100, self.updateLoudnessDisplay)
+        else:
+            self.decibel.config(text="Loudness (dB): 0")
 
     # Start GUI
     def startGUI(self):
-        self.root.geometry("800x500")
+        self.setValues()
+        self.root.geometry("270x215")
+        self.root.resizable(False, False)
         self.root.mainloop()
 
 if __name__ == "__main__":
