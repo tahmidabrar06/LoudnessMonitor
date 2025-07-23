@@ -5,6 +5,8 @@ import wave
 from scipy.signal import butter, lfilter
 import numpy
 import tkinter as tk
+from tkinter import Scale
+import threading
 
 class LoudnessMonitor:
     def __init__(self, volume=0.3, loudnessThreshhold=65, rate=44100, chunk=1024, cutoffFreq = 200):
@@ -49,9 +51,8 @@ class LoudnessMonitor:
 
     # Play alert
     def beep(self):
-        with wave.open(sys.path[0]+"\\beep.wav", 'rb') as wav:  
-            p = pyaudio.PyAudio()
-            alertStream = p.open(format=p.get_format_from_width(wav.getsampwidth()),
+        with wave.open(sys.path[0]+"\\beep.wav", 'rb') as wav:
+            alertStream = self.pyAudio.open(format=self.pyAudio.get_format_from_width(wav.getsampwidth()),
                             channels=wav.getnchannels(),
                             rate=wav.getframerate(),
                             output=True)
@@ -86,7 +87,7 @@ class LoudnessMonitor:
                 counter = 0
                 if self.decibel > self.loudnessThreshhold:
                     print("Too loud")
-                    self.beep()
+                    threading.Thread(target=self.beep, daemon=True).start()
     
     # Start Monitoring
     def start(self):
@@ -98,10 +99,60 @@ class LoudnessMonitor:
         self.running = False
 
 class GUI():
-    def __init__(self):
+    def __init__(self, loudnessMonitor):
         self.root = tk.Tk()
-    def StartGUI(self):
+        self.loudnessMonitor=loudnessMonitor
+        # Font
+        self.paramemterFont = ("Arial", 10)
+        self.buttonFont = ("Arial", 10)
+
+        # LoudnessMonitor Paramters
+        self.volumeSlider = Scale(self.root, from_=100, to=0)
+        self.volumeSlider.pack()
+        self.volume = tk.Label(self.root, text="Volume", font=self.paramemterFont)
+        self.volume.pack()
+
+        self.loudnessThresholdSlider = Scale(self.root, from_=120, to=1)
+        self.loudnessThresholdSlider.pack()
+        self.loudnessThreshold = tk.Label(self.root, text="Threshold (dB)", font=self.paramemterFont)
+        self.loudnessThreshold.pack()
+
+        # Buttons
+        self.startButton = tk.Button(self.root, text="Start", font=self.buttonFont, command=self.startLoudnessMonitor)
+        self.startButton.pack()
+
+        self.stopButton = tk.Button(self.root, text="Stop", font=self.buttonFont, command=self.stopLoudnessMonitor, state="disabled")
+        self.stopButton.pack()
+
+    # Update LoudnessMonitor parameters
+    def setParameters(self):
+        self.loudnessMonitor.volume = self.volumeSlider.get() / 100
+        self.loudnessMonitor.loudnessThreshhold = self.loudnessThresholdSlider.get()
+
+    # Start Loudness Monitor
+    def startLoudnessMonitor(self):
+        self.setParameters()
+        if not self.loudnessMonitor.running:
+            monitor_thread = threading.Thread(target=self.loudnessMonitor.start, daemon=True)
+            monitor_thread.start()
+        self.startButton.config(state="disabled")
+        self.stopButton.config(state="normal")
+        self.volumeSlider.config(state="disabled")
+        self.loudnessThresholdSlider.config(state="disabled")
+
+    # Stop Loudness Monitor
+    def stopLoudnessMonitor(self):
+        self.loudnessMonitor.stop()
+        self.startButton.config(state="normal")
+        self.stopButton.config(state="disabled")
+        self.volumeSlider.config(state="normal")
+        self.loudnessThresholdSlider.config(state="normal")
+
+    # Start GUI
+    def startGUI(self):
+        self.root.geometry("800x500")
         self.root.mainloop()
+
 if __name__ == "__main__":
-    LoudnessMonitor().start()
-    #GUI().StartGUI()
+    loudnessMonitor = LoudnessMonitor()
+    GUI(loudnessMonitor).startGUI()
